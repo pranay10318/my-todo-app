@@ -1,29 +1,49 @@
 const express = require("express");
+var csrf = require("csurf");
 const app = express();
-const bodyParser = require("body-parser"); //for parsing from/to json
-
-const path = require("path");
 const { Todo } = require("./models"); //for doing any operations on todo we should import models
+const bodyParser = require("body-parser"); //for parsing from/to json
+var cookieParser = require("cookie-parser");
+const path = require("path");
+
 app.use(bodyParser.json());
-//set ejs engine
-app.set("view engine", "ejs");
+app.use(express.urlencoded({ extended: false })); //for encoding urls  form submission for maniputlating todo
+
+app.use(cookieParser());
+app.use(csrf({ cookie: true }));
+app.set("view engine", "ejs"); //setting up engine to work with ejs
 
 app.get("/", async (request, response) => {
-  const allTodos = await Todo.getTodos();
+  const allTodo = await Todo.getTodos();
+  const dueToday = await Todo.dueToday();
+  const overdue = await Todo.overdue();
+  const dueLater = await Todo.dueLater();
+  const completedItems = await Todo.completedItems();
 
   if (request.accepts("html")) {
+    //request from web i.e. it accepts html   but for postman it accepts json that is in else part
     response.render("index", {
-      allTodos,
+      overdue,
+      allTodo,
+      dueToday,
+      dueLater,
+      completedItems,
+      csrfToken: request.csrfToken(),
     });
   } else {
+    //for postman like api  we should get json format as it donot support html
     response.json({
-      allTodos,
+      allTodo,
+      dueToday,
+      dueLater,
+      overdue,
+      completedItems,
     });
   }
 });
 app.use(express.static(path.join(__dirname, "public")));
 
-app.get("/todos", async function (request, response) {
+app.get("/todos", async (request, response) => {
   //getting todos from server
   console.log("Processing list of all Todos ...");
   // FILL IN YOUR CODE HERE
@@ -40,7 +60,7 @@ app.get("/todos", async function (request, response) {
   // response.send(todos)
 });
 
-app.get("/todos/:id", async function (request, response) {
+app.get("/todos/:id", async (request, response) => {
   //async for getting req
   try {
     const todo = await Todo.findByPk(request.params.id);
@@ -51,23 +71,29 @@ app.get("/todos/:id", async function (request, response) {
   }
 });
 
-app.post("/todos", async function (request, response) {
+app.post("/todos", async (request, response) => {
   //posting todos to server
   try {
-    const todo = await Todo.addTodo(request.body);
-    return response.json(todo);
+    await Todo.addTodo({
+      //here for posting we should pass a json format thing   before we directly type todo in body->raw of postman and post   now we should directly pass
+      title: request.body.title,
+      dueDate: request.body.dueDate,
+    });
+    return response.redirect("/");
   } catch (error) {
     console.log(error);
     return response.status(422).json(error);
   }
 });
 
-app.put("/todos/:id/markAsCompleted", async function (request, response) {
-  //for this router the todo at specific id should be marked as complete
-  const todo = await Todo.findByPk(request.params.id);
+app.put("/todos/:id", async function (request, response) {
+  console.log("we have to update a todo with ID:", request.params.id);
   try {
-    const updatedTodo = await todo.markAsCompleted();
-    return response.json(updatedTodo); // as markascompleted func returns the todo instance we should send it as response
+    const todo = await Todo.findByPk(request.params.id);
+    const updatedTodo = await todo.setCompletionStatus(
+      request.body.completed //this part we are passing in index.js body attribute
+    );
+    return response.json(updatedTodo);
   } catch (error) {
     console.log(error);
     return response.status(422).json(error);
@@ -77,6 +103,12 @@ app.put("/todos/:id/markAsCompleted", async function (request, response) {
 app.delete("/todos/:id", async function (request, response) {
   console.log("We have to delete a Todo with ID: ", request.params.id);
   // FILL IN YOUR CODE HERE
+  // try{//this code is by them i.e. wd   my code is below
+  //   await Todo.remove(request.params.id);
+  //   return response.json({success:true});
+  // }catch(error){
+  //   return response.status(422),json(error);
+  // }
   try {
     var c = await Todo.destroy({
       //as this function return the number of rows delted do we can check if >0 we can delete it

@@ -1,5 +1,6 @@
+/* eslint-disable no-unused-vars */
 "use strict";
-const { Model } = require("sequelize");
+const { Model, Op } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
   class Todo extends Model {
     /**
@@ -10,8 +11,47 @@ module.exports = (sequelize, DataTypes) => {
     static associate(models) {
       // define association here
     }
+
     static getTodos() {
-      return this.findAll();
+      return this.findAll(); //from sequelize package  donot confuse bro
+    }
+
+    static async dueToday() {
+      return this.findAll({
+        where: {
+          dueDate: new Date(),
+          completed: false,
+        },
+        order: [["id", "ASC"]],
+      });
+    }
+
+    static async dueLater() {
+      return this.findAll({
+        where: {
+          dueDate: {
+            [Op.gt]: new Date(),
+          },
+          completed: false,
+        }, //greater than the duedate
+        order: [["id", "ASC"]],
+      });
+    }
+    static async overdue() {
+      return this.findAll({
+        where: {
+          dueDate: { [Op.lt]: new Date() },
+          completed: false,
+        }, //greater than the duedate
+        order: [["id", "ASC"]],
+      });
+    }
+    static async remove(id) {
+      return this.destroy({
+        where: {
+          id,
+        },
+      });
     }
 
     static addTodo({ title, dueDate }) {
@@ -21,6 +61,18 @@ module.exports = (sequelize, DataTypes) => {
 
     markAsCompleted() {
       return this.update({ completed: true });
+    }
+    setCompletionStatus(completed) {
+      return this.update({ completed: completed });
+    }
+    static async completedItems() {
+      return await Todo.findAll({
+        where: {
+          completed: true,
+        },
+
+        order: [["id", "ASC"]],
+      });
     }
   }
   Todo.init(
