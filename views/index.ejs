@@ -4,13 +4,44 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
     <link href="./css/styles.css" rel="stylesheet">
-    <title>my-todo-app</title>
+    <title>To-Do-Manager</title>
 </head>
 <body>
-    <%- include('header.ejs')%>
-    <%- include('todo.ejs') %> 
-    <%- include('footer.ejs') %> 
+    <div class="grid grid-cols-6">
+        <div class="col-start-3 col-span-2">
+          <%- include('header.ejs') %>
+          <form>
+            <div class="flex gap-2 py-4">
+              <div class="flex-auto">
+                <input
+                  type="text"
+                  placeholder="What's next?"
+                  class="border border-color-gray-300 text-gray-900 rounded w-full p-2 text-sm"
+                  required
+                />
+              </div>
+              <div class="flex-auto">
+                <input
+                  type="date"
+                  class="border border-color-gray-300 text-gray-900 rounded w-full p-2 text-sm leading-4"
+                />
+              </div>
+              <div class="flex-none">
+                <button
+                  type="submit"
+                  class="bg-green-600 text-white px-5 py-2 rounded font-mediium py-1.5"
+                >
+                  ADD
+                </button>
+              </div>
+            </div>
+          </form>
+          <%- include("todo.ejs") %>
+          
+        </div>
+      </div>
     
 </body>
 </html>
