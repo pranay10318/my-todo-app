@@ -1,12 +1,27 @@
 const express = require("express");
 const app = express();
-const { Todo } = require("./models"); //for doing any operations on todo we should import models
 const bodyParser = require("body-parser"); //for parsing from/to json
-app.use(bodyParser.json());
 
-app.get("/", function (request, response) {
-  response.send("Hello World");
+const path = require("path");
+const { Todo } = require("./models"); //for doing any operations on todo we should import models
+app.use(bodyParser.json());
+//set ejs engine
+app.set("view engine", "ejs");
+
+app.get("/", async (request, response) => {
+  const allTodos = await Todo.getTodos();
+
+  if (request.accepts("html")) {
+    response.render("index", {
+      allTodos,
+    });
+  } else {
+    response.json({
+      allTodos,
+    });
+  }
 });
+app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/todos", async function (request, response) {
   //getting todos from server

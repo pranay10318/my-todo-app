@@ -10,6 +10,9 @@ module.exports = (sequelize, DataTypes) => {
     static associate(models) {
       // define association here
     }
+    static getTodos() {
+      return this.findAll();
+    }
 
     static addTodo({ title, dueDate }) {
       //refactoring for business logic and we can add a todo at any endpoint
