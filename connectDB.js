@@ -8,7 +8,7 @@ const password = "postgres";
 const sequelize = new Sequelize(database, username, password, {
   host: "localhost",
   dialect: "postgres",
-  logging: false,//to remove everytime logging
+  logging: false, //to remove everytime logging
 });
 
 sequelize

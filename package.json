@@ -17,27 +17,27 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pranay10318/lv4.git"
+    "url": "git+https://github.com/pranay10318/my-todo-app.git"
   },
   "author": "pranay <pranayradharapu1@gmail.com>",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/pranay10318/lv4/issues"
+    "url": "https://github.com/pranay10318/my-todo-app.git"
   },
-  "homepage": "https://github.com/pranay10318/lv4#readme",
+  "homepage": "https://github.com/pranay10318/my-todo-app#readme",
   "dependencies": {
-    "husky": "^8.0.2",
     "jest": "^29.3.0",
-    "lint-staged": "^13.0.3",
     "minimist": "^1.2.7",
     "pg": "^8.8.0",
     "pg-hstore": "^2.3.4",
-    "prettier": "^2.7.1",
     "sequelize": "^6.27.0",
     "sqlite3": "^5.1.4"
   },
   "devDependencies": {
     "eslint": "^8.27.0",
+    "husky": "^8.0.2",
+    "lint-staged": "^13.1.0",
+    "prettier": "^2.8.1",
     "sequelize-cli": "^6.5.2"
   }
 }
