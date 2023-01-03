@@ -1,5 +1,5 @@
 const express = require("express");
-var csrf = require("csurf");
+var csrf = require("tiny-csrf");
 const app = express();
 const { Todo } = require("./models"); //for doing any operations on todo we should import models
 const bodyParser = require("body-parser"); //for parsing from/to json
@@ -9,8 +9,8 @@ const path = require("path");
 app.use(bodyParser.json());
 app.use(express.urlencoded({ extended: false })); //for encoding urls  form submission for maniputlating todo
 
-app.use(cookieParser());
-app.use(csrf({ cookie: true }));
+app.use(cookieParser("SSH! THIS IS A SCRET CODE"));
+app.use(csrf("123456789iamasecret987654321look", ["POST", "PUT", "DELETE"]));
 app.set("view engine", "ejs"); //setting up engine to work with ejs
 
 app.get("/", async (request, response) => {
