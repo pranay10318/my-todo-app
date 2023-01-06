@@ -1,10 +1,20 @@
+/* eslint-disable no-unused-vars */
 const express = require("express");
 var csrf = require("tiny-csrf");
 const app = express();
-const { Todo } = require("./models"); //for doing any operations on todo we should import models
+const { Todo, User } = require("./models"); //for doing any operations on todo we should import models
 const bodyParser = require("body-parser"); //for parsing from/to json
 var cookieParser = require("cookie-parser");
 const path = require("path");
+const user = require("./models/user");
+const passport = require("passport");
+const connectEnsureLogin = require("connect-ensure-login");
+const session = require("express-session");
+const LocalStrategy = require("passport-local");
+const bcrypt = require("bcrypt");
+const flash = require("connect-flash");
+
+const saltRounds = 10;
 
 app.use(bodyParser.json());
 app.use(express.urlencoded({ extended: false })); //for encoding urls  form submission for maniputlating todo
@@ -12,119 +22,375 @@ app.use(express.urlencoded({ extended: false })); //for encoding urls  form subm
 app.use(cookieParser("SSH! THIS IS A SCRET CODE"));
 app.use(csrf("123456789iamasecret987654321look", ["POST", "PUT", "DELETE"]));
 app.set("view engine", "ejs"); //setting up engine to work with ejs
-
-app.get("/", async (request, response) => {
-  const allTodo = await Todo.getTodos();
-  const dueToday = await Todo.dueToday();
-  const overdue = await Todo.overdue();
-  const dueLater = await Todo.dueLater();
-  const completedItems = await Todo.completedItems();
-
-  if (request.accepts("html")) {
-    //request from web i.e. it accepts html   but for postman it accepts json that is in else part
-    response.render("index", {
-      overdue,
-      allTodo,
-      dueToday,
-      dueLater,
-      completedItems,
-      csrfToken: request.csrfToken(),
-    });
-  } else {
-    //for postman like api  we should get json format as it donot support html
-    response.json({
-      allTodo,
-      dueToday,
-      dueLater,
-      overdue,
-      completedItems,
-    });
-  }
-});
 app.use(express.static(path.join(__dirname, "public")));
 
-app.get("/todos", async (request, response) => {
-  //getting todos from server
-  console.log("Processing list of all Todos ...");
-  // FILL IN YOUR CODE HERE
-  try {
-    const todos = await Todo.findAll();
-    return response.send(todos);
-  } catch (error) {
-    console.log(error);
-    return response.status(422).json(error);
-  }
+app.use(flash());
+app.use(
+  session({
+    secret: "my-super-secret-keyq3243141234",
+    cookie: {
+      maxAge: 24 * 60 * 60 * 1000, //24hrs
+    },
+  })
+);
+app.use(function (request, response, next) {
+  response.locals.messages = request.flash();
+  next();
+});
+app.use(passport.initialize());
+app.use(passport.session());
 
-  // First, we have to query our PostgerSQL database using Sequelize to get list of all Todos.
-  // Then, we have to respond with all Todos, like:
-  // response.send(todos)
+passport.use(
+  new LocalStrategy(
+    {
+      usernameField: "email",
+      passwordField: "password",
+    },
+    (username, password, done) => {
+      User.findOne({ where: { email: username } })
+        .then(async function (user) {
+          const result = await bcrypt.compare(password, user.password);
+          if (result) {
+            return done(null, user);
+          } else {
+            return done(null, false, {
+              //if password is not correct
+              message: "Invalid Emailid or password",
+            });
+          }
+        })
+        .catch((error) => {
+          //if user is not found
+          return done(null, false, { message: "Invalid Emailid or password" });
+        });
+    }
+  )
+);
+
+passport.serializeUser((user, done) => {
+  console.log("Serializing user with id ", user.id);
+  done(null, user.id);
 });
 
-app.get("/todos/:id", async (request, response) => {
-  //async for getting req
-  try {
-    const todo = await Todo.findByPk(request.params.id);
-    return response.json(todo);
-  } catch (error) {
-    console.log(error);
-    return response.status(422).json(error);
-  }
-});
-
-app.post("/todos", async (request, response) => {
-  //posting todos to server
-  try {
-    await Todo.addTodo({
-      //here for posting we should pass a json format thing   before we directly type todo in body->raw of postman and post   now we should directly pass
-      title: request.body.title,
-      dueDate: request.body.dueDate,
+passport.deserializeUser((id, done) => {
+  User.findByPk(id)
+    .then((user) => {
+      done(null, user);
+    })
+    .catch((error) => {
+      done(error, null);
     });
-    return response.redirect("/");
+});
+//passport part ,session creation end.
+
+app.get("/", async (request, response) => {
+  response.render("index", {
+    title: "Todo Application",
+    csrfToken: request.csrfToken(),
+  });
+});
+
+app.get(
+  "/todos",
+  connectEnsureLogin.ensureLoggedIn(),
+  async (request, response) => {
+    const loggedInUser = request.user.id;
+    const allTodo = await Todo.getTodos(loggedInUser);
+    const dueToday = await Todo.dueToday(loggedInUser);
+    const overdue = await Todo.overdue(loggedInUser);
+    const dueLater = await Todo.dueLater(loggedInUser);
+    const completedItems = await Todo.completedItems(loggedInUser);
+
+    if (request.accepts("html")) {
+      //request from web i.e. it accepts html   but for postman it accepts json that is in else part
+      response.render("todos", {
+        //new todos.ejs should be created
+        title: "my todos",
+        overdue,
+        allTodo,
+        dueToday,
+        dueLater,
+        completedItems,
+        email: request.user.email,
+        csrfToken: request.csrfToken(),
+      });
+    } else {
+      //for postman like api  we should get json format as it donot support html
+      response.json({
+        allTodo,
+        dueToday,
+        dueLater,
+        overdue,
+        completedItems,
+      });
+    }
+  }
+);
+
+app.post("/users", async function (request, response) {
+  if (request.body.firstName.length == 0) {
+    request.flash("error", "First name Required");
+    return response.redirect("/signup");
+  } else if (request.body.email.length == 0) {
+    request.flash("error", "Email Required");
+    return response.redirect("/signup");
+  } else if (request.body.password.length == 0) {
+    request.flash("error", "Password Required");
+    return response.redirect("/signup");
+  }
+  console.log("creating new User", request.body);
+  const hashedPwd = await bcrypt.hash(request.body.password, saltRounds);
+  try {
+    const user = await User.create({
+      firstName: request.body.firstname,
+      lastName: request.body.lastname,
+      email: request.body.email,
+      password: hashedPwd,
+    });
+    request.login(user, (err) => {
+      if (err) {
+        console.log(err);
+        response.redirect("/todos");
+      } else {
+        request.flash("success", "Successfully Signed up");
+        response.redirect("/todos");
+      }
+    });
   } catch (error) {
     console.log(error);
-    return response.status(422).json(error);
+    request.flash("error", "Email already Exists");
+    return response.redirect("/signup");
   }
 });
 
-app.put("/todos/:id", async function (request, response) {
-  console.log("we have to update a todo with ID:", request.params.id);
-  try {
-    const todo = await Todo.findByPk(request.params.id);
-    const updatedTodo = await todo.setCompletionStatus(
-      request.body.completed //this part we are passing in index.js body attribute
-    );
-    return response.json(updatedTodo);
-  } catch (error) {
-    console.log(error);
-    return response.status(422).json(error);
+app.post(
+  "/session",
+  passport.authenticate("local", {
+    failureRedirect: "/login",
+    failureFlash: true,
+  }),
+  function (request, response) {
+    console.log(request.user);
+    response.redirect("/todos");
   }
+);
+
+app.post(
+  "/todos",
+  connectEnsureLogin.ensureLoggedIn(),
+  async function (request, response) {
+    let pattern = new RegExp("^\\s");
+    let result = Boolean(pattern.test(request.body.title));
+    console.log(result);
+    if (result) {
+      request.flash("error", "Enter the title");
+      return response.redirect("/todos");
+    } else if (request.body.title.length < 5) {
+      request.flash("error", "Title should be atleast 5 characters");
+      return response.redirect("/todos");
+    }
+    if (request.body.dueDate.length == 0) {
+      request.flash("error", "Enter the dueDate");
+      return response.redirect("/todos");
+    }
+    console.log("creating new todo", request.body);
+    try {
+      await Todo.addTodo({
+        title: request.body.title,
+        dueDate: request.body.dueDate,
+        userId: request.user.id,
+      });
+      return response.redirect("/todos");
+    } catch (error) {
+      console.log(error);
+      return response.status(422).json(error);
+    }
+  }
+);
+
+// app.get("/todos", async (request, response) => {
+//   //getting todos from server
+//   console.log("Processing list of all Todos ...");
+//   // FILL IN YOUR CODE HERE
+//   try {
+//     const todos = await Todo.findAll();
+//     return response.send(todos);
+//   } catch (error) {
+//     console.log(error);
+//     return response.status(422).json(error);
+//   }
+
+//   // First, we have to query our PostgerSQL database using Sequelize to get list of all Todos.
+//   // Then, we have to respond with all Todos, like:
+//   // response.send(todos)
+// });
+
+app.get(
+  "/todos/:id",
+  connectEnsureLogin.ensureLoggedIn(),
+  async (request, response) => {
+    //async for getting req
+    try {
+      const todo = await Todo.findByPk(request.params.id);
+      return response.json(todo);
+    } catch (error) {
+      console.log(error);
+      return response.status(422).json(error);
+    }
+  }
+);
+app.get("/signup", (request, response) => {
+  response.render("signup", {
+    title: "signup",
+    csrfToken: request.csrfToken(),
+  });
 });
 
-app.delete("/todos/:id", async function (request, response) {
-  console.log("We have to delete a Todo with ID: ", request.params.id);
-  // FILL IN YOUR CODE HERE
-  // try{//this code is by them i.e. wd   my code is below
-  //   await Todo.remove(request.params.id);
-  //   return response.json({success:true});
-  // }catch(error){
-  //   return response.status(422),json(error);
-  // }
-  try {
-    var c = await Todo.destroy({
-      //as this function return the number of rows delted do we can check if >0 we can delete it
-      where: {
+// app.post("/users", async (request, response) => {
+//   //here we are posting the credentials to our db   which is routed from signup page
+//   // console.log(request.body.firstName);
+//   const hashedPwd = await bcrypt.hash(request.body.password, saltRounds); //not sync
+//   console.log(hashedPwd);
+//   try {
+//     const user = await User.create({
+//       firstName: request.body.firstName,
+//       lastName: request.body.lastName,
+//       email: request.body.email,
+//       password: hashedPwd,
+//     });
+//     request.logIn(user, (err) => {
+//       if (err) {
+//         console.log(err);
+//       }
+//       response.redirect("/todos");
+//     });
+//   } catch (error) {
+//     console.log(error);
+//   }
+// });
+//for login get and post
+app.get("/login", (request, response) => {
+  //getting login page to webpage
+  response.render("login", {
+    //we are rendering login.ejs
+    title: "LogIn page",
+    csrfToken: request.csrfToken(),
+  });
+});
+
+// app.post(
+//   "/session",
+//   passport.authenticate("local", {
+//     failureRedirect: "/login",
+//     failureFlash: true,
+//   }),
+//   function (request, response) {
+//     console.log(request.user);
+//     response.redirect("/todos");
+//   }
+// );
+
+//signout of user
+app.get("/signout", (request, response, next) => {
+  //next handler
+  request.logOut((err) => {
+    if (err) return next(err);
+    response.redirect("/");
+  });
+});
+
+// app.post(
+//   "/todos",
+//   connectEnsureLogin.ensureLoggedIn(),
+//   async (request, response) => {
+//     //posting todos to server
+//     let pattern = new RegExp("^\\s");
+//     let result = Boolean(pattern.test(request.body.title));
+//     console.log(result);
+//     if (result) {//if result no title entered
+//       request.flash("error", "Enter the title");
+//       return response.redirect("/todos");
+//     }
+//     else if (request.body.title.length < 5) {
+//       request.flash("error", "please provide a title with atleast 5 characters");
+//       return response.redirect("/todos");
+//     }
+//     if (request.body.dueDate.length == 0) {//if date is not
+//       request.flash("error", "Enter the dueDate");
+//       return response.redirect("/todos");
+//     }
+
+//     console.log("creating a todo");
+//     console.log(request.user);
+//     try {
+//       await Todo.addTodo({
+//         //here for posting we should pass a json format thing   before we directly type todo in body->raw of postman and post   now we should directly pass
+//         title: request.body.title,
+//         dueDate: request.body.dueDate,
+//         userId: request.user.id,
+//       });
+//       return response.redirect("/todos");
+//     } catch (error) {
+//       console.log(error);
+//       return response.status(422).json(error);
+//     }
+//   }
+// );
+
+app.put(
+  "/todos/:id",
+  connectEnsureLogin.ensureLoggedIn(),
+  async function (request, response) {
+    const loggedInUser = request.user.id;
+    console.log("we have to update a todo with ID:", request.params.id);
+    try {
+      const todo = await Todo.findByPk(request.params.id);
+      const updatedTodo = await todo.setCompletionStatus(
+        request.body.completed, //this part we are passing in index.js body attribute
+        loggedInUser
+      );
+      return response.json(updatedTodo);
+    } catch (error) {
+      console.log(error);
+      return response.status(422).json(error);
+    }
+  }
+);
+
+app.delete(
+  "/todos/:id",
+  connectEnsureLogin.ensureLoggedIn(),
+  async function (request, response) {
+    console.log("We have to delete a Todo with ID: ", request.params.id);
+    // FILL IN YOUR CODE HERE
+    try {
+      //this code is by them i.e. wd   my code is below
+      await Todo.remove({
         id: request.params.id,
-      },
-    });
-    response.send(c > 0); ///return bool value true if c>0 else false
-  } catch (error) {
-    console.log(error);
-    return response.status(422).json(error);
-  }
+        userId: request.user.id,
+      });
+      return response.json({ success: true });
+    } catch (error) {
+      return response.status(422).json(error);
+    }
+    // try {
+    //   var c = await Todo.destroy({
+    //     //as this function return the number of rows delted do we can check if >0 we can delete it
+    //     where: {
+    //       id: request.params.id,
+    //       userId:request.user.id,
+    //     },
+    //   });
+    //   response.send(c > 0); ///return bool value true if c>0 else false
+    // } catch (error) {
+    //   console.log(error);
+    //   return response.status(422).json(error);
+    // }
 
-  // First, we have to query our database to delete a Todo by ID.
-  // Then, we have to respond back with true/false based on whether the Todo was deleted or not.
-  // response.send(true)
-});
+    // First, we have to query our database to delete a Todo by ID.
+    // Then, we have to respond back with true/false based on whether the Todo was deleted or not.
+    // response.send(true)
+  }
+);
 
 module.exports = app;
