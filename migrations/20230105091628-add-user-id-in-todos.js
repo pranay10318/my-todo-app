@@ -5,14 +5,14 @@ module.exports = {
     // await queryInterface.addColumn("Todos", "userId", {
     //   type: Sequelize.DataTypes.INTEGER,
     // });
-    await queryInterface.addConstraint("Todos", {
-      fields: ["userId"],
-      type: "foreign key",
-      references: {
-        table: "Users",
-        field: "id",
-      },
-    });
+    // await queryInterface.addConstraint("Todos", {
+    //   fields: ["userId"],
+    //   type: "foreign key",
+    //   references: {
+    //     table: "Users",
+    //     field: "id",
+    //   },
+    // });
     /**
      * Add altering commands here.
      *
