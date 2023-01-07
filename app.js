@@ -1,6 +1,7 @@
 /* eslint-disable no-unused-vars */
 const express = require("express");
 var csrf = require("tiny-csrf");
+
 const app = express();
 const { Todo, User } = require("./models"); //for doing any operations on todo we should import models
 const bodyParser = require("body-parser"); //for parsing from/to json
@@ -20,7 +21,7 @@ app.use(bodyParser.json());
 app.use(express.urlencoded({ extended: false })); //for encoding urls  form submission for maniputlating todo
 
 app.use(cookieParser("SSH! THIS IS A SCRET CODE"));
-app.use(csrf("123456789iamasecret987654321look", ["POST", "PUT", "DELETE"]));
+app.use(csrf("12345678998765432198765432112345", ["POST", "PUT", "DELETE"]));
 app.set("view engine", "ejs"); //setting up engine to work with ejs
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -84,8 +85,13 @@ passport.deserializeUser((id, done) => {
 //passport part ,session creation end.
 
 app.get("/", async (request, response) => {
+  var bul = false;
+  if (request.user) {
+    bul = true;
+  }
   response.render("index", {
     title: "Todo Application",
+    loginStatus: bul,
     csrfToken: request.csrfToken(),
   });
 });
@@ -179,13 +185,11 @@ app.post(
   "/todos",
   connectEnsureLogin.ensureLoggedIn(),
   async function (request, response) {
-    let pattern = new RegExp("^\\s");
-    let result = Boolean(pattern.test(request.body.title));
-    console.log(result);
-    if (result) {
+    if (request.body.title.length == 0) {
       request.flash("error", "Enter the title");
       return response.redirect("/todos");
-    } else if (request.body.title.length < 5) {
+    }
+    if (request.body.title.length < 5) {
       request.flash("error", "Title should be atleast 5 characters");
       return response.redirect("/todos");
     }
@@ -208,23 +212,6 @@ app.post(
   }
 );
 
-// app.get("/todos", async (request, response) => {
-//   //getting todos from server
-//   console.log("Processing list of all Todos ...");
-//   // FILL IN YOUR CODE HERE
-//   try {
-//     const todos = await Todo.findAll();
-//     return response.send(todos);
-//   } catch (error) {
-//     console.log(error);
-//     return response.status(422).json(error);
-//   }
-
-//   // First, we have to query our PostgerSQL database using Sequelize to get list of all Todos.
-//   // Then, we have to respond with all Todos, like:
-//   // response.send(todos)
-// });
-
 app.get(
   "/todos/:id",
   connectEnsureLogin.ensureLoggedIn(),
@@ -246,28 +233,6 @@ app.get("/signup", (request, response) => {
   });
 });
 
-// app.post("/users", async (request, response) => {
-//   //here we are posting the credentials to our db   which is routed from signup page
-//   // console.log(request.body.firstName);
-//   const hashedPwd = await bcrypt.hash(request.body.password, saltRounds); //not sync
-//   console.log(hashedPwd);
-//   try {
-//     const user = await User.create({
-//       firstName: request.body.firstName,
-//       lastName: request.body.lastName,
-//       email: request.body.email,
-//       password: hashedPwd,
-//     });
-//     request.logIn(user, (err) => {
-//       if (err) {
-//         console.log(err);
-//       }
-//       response.redirect("/todos");
-//     });
-//   } catch (error) {
-//     console.log(error);
-//   }
-// });
 //for login get and post
 app.get("/login", (request, response) => {
   //getting login page to webpage
@@ -278,18 +243,6 @@ app.get("/login", (request, response) => {
   });
 });
 
-// app.post(
-//   "/session",
-//   passport.authenticate("local", {
-//     failureRedirect: "/login",
-//     failureFlash: true,
-//   }),
-//   function (request, response) {
-//     console.log(request.user);
-//     response.redirect("/todos");
-//   }
-// );
-
 //signout of user
 app.get("/signout", (request, response, next) => {
   //next handler
@@ -298,44 +251,6 @@ app.get("/signout", (request, response, next) => {
     response.redirect("/");
   });
 });
-
-// app.post(
-//   "/todos",
-//   connectEnsureLogin.ensureLoggedIn(),
-//   async (request, response) => {
-//     //posting todos to server
-//     let pattern = new RegExp("^\\s");
-//     let result = Boolean(pattern.test(request.body.title));
-//     console.log(result);
-//     if (result) {//if result no title entered
-//       request.flash("error", "Enter the title");
-//       return response.redirect("/todos");
-//     }
-//     else if (request.body.title.length < 5) {
-//       request.flash("error", "please provide a title with atleast 5 characters");
-//       return response.redirect("/todos");
-//     }
-//     if (request.body.dueDate.length == 0) {//if date is not
-//       request.flash("error", "Enter the dueDate");
-//       return response.redirect("/todos");
-//     }
-
-//     console.log("creating a todo");
-//     console.log(request.user);
-//     try {
-//       await Todo.addTodo({
-//         //here for posting we should pass a json format thing   before we directly type todo in body->raw of postman and post   now we should directly pass
-//         title: request.body.title,
-//         dueDate: request.body.dueDate,
-//         userId: request.user.id,
-//       });
-//       return response.redirect("/todos");
-//     } catch (error) {
-//       console.log(error);
-//       return response.status(422).json(error);
-//     }
-//   }
-// );
 
 app.put(
   "/todos/:id",
@@ -373,23 +288,6 @@ app.delete(
     } catch (error) {
       return response.status(422).json(error);
     }
-    // try {
-    //   var c = await Todo.destroy({
-    //     //as this function return the number of rows delted do we can check if >0 we can delete it
-    //     where: {
-    //       id: request.params.id,
-    //       userId:request.user.id,
-    //     },
-    //   });
-    //   response.send(c > 0); ///return bool value true if c>0 else false
-    // } catch (error) {
-    //   console.log(error);
-    //   return response.status(422).json(error);
-    // }
-
-    // First, we have to query our database to delete a Todo by ID.
-    // Then, we have to respond back with true/false based on whether the Todo was deleted or not.
-    // response.send(true)
   }
 );
 
