@@ -264,6 +264,7 @@ app.put(
         request.body.completed, //this part we are passing in index.js body attribute
         loggedInUser
       );
+      console.log("the checkkkkkkkkkkkkkk.................", updatedTodo);
       return response.json(updatedTodo);
     } catch (error) {
       console.log(error);
@@ -280,11 +281,12 @@ app.delete(
     // FILL IN YOUR CODE HERE
     try {
       //this code is by them i.e. wd   my code is below
-      await Todo.remove({
+      var c = await Todo.remove({
         id: request.params.id,
         userId: request.user.id,
       });
-      return response.json({ success: true });
+      if (c > 0) return response.json(true);
+      return response.json(false);
     } catch (error) {
       return response.status(422).json(error);
     }
