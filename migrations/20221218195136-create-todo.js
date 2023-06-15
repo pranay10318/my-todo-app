@@ -12,7 +12,7 @@ module.exports = {
         type: Sequelize.INTEGER,
       },
       title: {
-        type: DataTypes.STRING,
+        type: Sequelize.STRING,
         allowNull: false,
         validate: {
           notNull: true,
@@ -22,8 +22,8 @@ module.exports = {
       dueDate: {
         type: Sequelize.DATEONLY,
       },
-      complete: {
-        type: DataTypes.BOOLEAN,
+      completed: {
+        type: Sequelize.BOOLEAN,
         defaultValue: false,
       },
       createdAt: {
